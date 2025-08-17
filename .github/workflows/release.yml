@@ -1,0 +1,72 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g., v0.1.0). If omitted, uses the current ref."
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: release (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: downloader-x86_64-unknown-linux-gnu.tar.gz
+            bin_path: target/release/downloader
+            pack: |
+              chmod +x target/release/downloader
+              if command -v strip >/dev/null 2>&1; then strip target/release/downloader || true; fi
+              tar -czf ${{ matrix.artifact_name }} -C target/release downloader
+          - os: windows-latest
+            artifact_name: downloader-x86_64-pc-windows-msvc.zip
+            bin_path: target/release/downloader.exe
+            pack: |
+              powershell -NoProfile -Command "Compress-Archive -Path 'target/release/downloader.exe' -DestinationPath '${{ matrix.artifact_name }}' -Force"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Package artifact
+        shell: bash
+        run: ${{ matrix.pack }}
+
+      - name: Create or update GitHub Release and upload asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: |
+            ${{ matrix.artifact_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
