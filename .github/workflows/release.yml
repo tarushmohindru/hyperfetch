@@ -28,21 +28,32 @@ jobs:
           - os: ubuntu-latest
             artifact_name: hyperfetch-x86_64-unknown-linux-gnu.tar.gz
             bin_path: target/release/hyperfetch
-            pack: |
-              chmod +x target/release/hyperfetch
-              if command -v strip >/dev/null 2>&1; then strip target/release/hyperfetch || true; fi
-              tar -czf ${{ matrix.artifact_name }} -C target/release hyperfetch
           - os: windows-latest
             artifact_name: hyperfetch-x86_64-pc-windows-msvc.zip
             bin_path: target/release/hyperfetch.exe
-            pack: |
-              powershell -NoProfile -Command "Compress-Archive -Path 'target/release/hyperfetch.exe' -DestinationPath '${{ matrix.artifact_name }}' -Force"
 
     steps:
+      - name: Resolve tag/ref
+        id: vars
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -z "${{ github.event.inputs.tag }}" ]; then
+              echo "::error::No tag provided. Enter a tag like v0.1.1 when running manually." && exit 1
+            fi
+            echo "release_tag=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+            echo "checkout_ref=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            # For tag pushes, use the pushed tag/ref
+            echo "release_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "checkout_ref=${{ github.ref }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ steps.vars.outputs.checkout_ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -55,14 +66,24 @@ jobs:
       - name: Build release
         run: cargo build --release
 
-      - name: Package artifact
+      - name: Package artifact (Linux)
+        if: runner.os == 'Linux'
         shell: bash
-        run: ${{ matrix.pack }}
+        run: |
+          chmod +x target/release/hyperfetch
+          if command -v strip >/dev/null 2>&1; then strip target/release/hyperfetch || true; fi
+          tar -czf "${{ matrix.artifact_name }}" -C target/release hyperfetch
+
+      - name: Package artifact (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'target/release/hyperfetch.exe' -DestinationPath '${{ matrix.artifact_name }}' -Force
 
       - name: Create or update GitHub Release and upload asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.vars.outputs.release_tag }}
           files: |
             ${{ matrix.artifact_name }}
           draft: false
