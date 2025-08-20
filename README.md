@@ -14,21 +14,19 @@ Fast, reliable CLI downloader for HTTP(S) with multi-connection segmented downlo
 
 ### Option 1: Prebuilt binaries (recommended)
 Grab the latest release from the GitHub Releases page:
-- Linux (x86_64): `hyperfetch-x86_64-unknown-linux-gnu.tar.gz`
-- Windows (x86_64): `hyperfetch-x86_64-pc-windows-msvc.zip`
+- Linux (x86_64): `hyperfetch`
+- Windows (x86_64): `hyperfetch.exe`
 
 Linux:
 ```bash
-# Download the tar.gz from Releases, then:
-tar -xzf hyperfetch-x86_64-unknown-linux-gnu.tar.gz
+# Download the hyperfetch linux executable from Releases, then:
 chmod +x hyperfetch
 ./hyperfetch --help
 ```
 
 Windows (PowerShell):
 ```powershell
-# Download the .zip from Releases, then:
-Expand-Archive -Path hyperfetch-x86_64-pc-windows-msvc.zip -DestinationPath . -Force
+# Download the .exe from Releases, then:
 ./hyperfetch.exe --help
 ```
 
