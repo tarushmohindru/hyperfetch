@@ -45,37 +45,37 @@ cargo build --release
 ## Usage
 Basic:
 ```bash
-hyperfetch \"<URL>\"
+hyperfetch "<URL>"
 ```
 
 Specify output path:
 ```bash
-hyperfetch \"<URL>\" -o /path/to/file.iso
+hyperfetch "<URL>" -o /path/to/file.iso
 ```
 
 Increase concurrency (default 16):
 ```bash
-hyperfetch \"<URL>\" --connections 32
+hyperfetch "<URL>" --connections 32
 ```
 
 Set chunk size (supports K, M, G, T; default 1M):
 ```bash
-hyperfetch \"<URL>\" --chunk-size 4M
+hyperfetch "<URL>" --chunk-size 4M
 ```
 
 Resume is enabled by default. To disable:
 ```bash
-hyperfetch \"<URL>\" --no-resume
+hyperfetch "<URL>" --no-resume
 ```
 
 Adaptive chunking is enabled by default. To disable:
 ```bash
-hyperfetch \"<URL>\" --no-adaptive
+hyperfetch "<URL>" --no-adaptive
 ```
 
 Custom User-Agent and headers (repeat --header as needed):
 ```bash
-hyperfetch \"<URL>\" \
+hyperfetch "<URL>" \
   --user-agent "Hyperfetch/1.0" \
   --header "Accept: */*" \
   --header "Authorization: Bearer <token>"
@@ -83,16 +83,16 @@ hyperfetch \"<URL>\" \
 
 Retries and timeouts:
 ```bash
-hyperfetch \"<URL>\" --retries 5 --timeout 45
+hyperfetch "<URL>" --retries 5 --timeout 45
 ```
 
 Quiet and verbose modes:
 ```bash
 # Quiet (no progress bar)
-hyperfetch \"<URL>\" --quiet
+hyperfetch "<URL>" --quiet
 
 # Verbose (extra console info)
-hyperfetch \"<URL>\" --verbose
+hyperfetch "<URL>" --verbose
 ```
 
 ### Full CLI reference
