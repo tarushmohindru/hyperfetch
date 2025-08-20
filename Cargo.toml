@@ -6,15 +6,8 @@ authors = ["Tarush Mohindru <tarushmohindru1515@gmail.com>"]
 description = "A superfast multithreaded downloader"
 license = "MIT"
 repository = "https://github.com/tarushmohindru/hyperfetch"
-keywords = [
-    "downloader",
-    "multithreaded",
-    "fast",
-    "async",
-    "high-speed",
-    "high-performance",
-]
-categories = ["Command-line utilities", "Networking", "File transfer"]
+keywords = ["downloader", "multithreaded", "fast", "async", "high-speed"]
+categories = ["command-line-utilities", "network-programming"]
 
 [dependencies]
 anyhow = "1.0.99"
