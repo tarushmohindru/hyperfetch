@@ -7,7 +7,7 @@ use hyperfetch::{
     utils::{extract_filename_from_url, format_bytes, format_duration, format_speed, parse_size},
 };
 use indicatif::{ProgressBar, ProgressStyle};
-use std::{collections::HashMap, io::Write, time::Duration};
+use std::{collections::HashMap, fs, io::Write, path::Path, time::Duration};
 use tokio::time::Instant;
 
 #[tokio::main]
@@ -17,6 +17,7 @@ async fn main() -> Result<(), anyhow::Error> {
     let url = cli.url;
     let output_path = cli
         .output
+        .clone()
         .unwrap_or_else(|| extract_filename_from_url(&url));
 
     let max_connections = cli.connections;
@@ -71,7 +72,7 @@ async fn main() -> Result<(), anyhow::Error> {
         let pb = ProgressBar::new(0);
         pb.set_style(
             ProgressStyle::default_bar().
-            template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}) ETA: {eta}")
+            template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}) ETA: {eta} | {msg}")
             ?.progress_chars("##-"),
         );
         Some(pb)
@@ -139,6 +140,38 @@ async fn main() -> Result<(), anyhow::Error> {
         Ok(_) => {
             let elapsed = start_time.elapsed();
             let final_progress = downloader.get_progress();
+            let mut final_path = output_path.clone();
+
+            let path = Path::new(&output_path);
+            if path.extension().is_none() {
+                println!(
+                    "DEBUG: Filename '{}' has no extension. Attempting to infer type from content...",
+                    output_path
+                );
+            }
+            match infer::get_from_path(&output_path) {
+                Ok(Some(kind)) => {
+                    let extension = kind.extension();
+                    let new_path = format!("{}.{}", output_path, extension);
+                    if fs::rename(output_path, &new_path).is_ok() {
+                        final_path = new_path;
+                        println!("DEBUG: Renamed file to '{}'", final_path);
+                    } else {
+                        eprintln!("DEBUG: Error: Failed to rename the file.");
+                    }
+                }
+                Ok(None) => {
+                    println!(
+                        "DEBUG: Could not infer the file type. The format is unknown or not supported by 'infer'."
+                    );
+                }
+                Err(e) => {
+                    eprintln!(
+                        "DEBUG: An error occurred while trying to read the file for inference: {}",
+                        e
+                    );
+                }
+            }
 
             if !quite {
                 println!();
@@ -146,7 +179,7 @@ async fn main() -> Result<(), anyhow::Error> {
                     "{}",
                     style("Download completed successfully!").green().bold()
                 );
-                println!("File: {}", output_path);
+                println!("File: {}", final_path);
                 println!("Size: {}", format_bytes(final_progress.total_bytes));
                 println!("Time: {}", format_duration(elapsed.as_secs()));
                 println!(

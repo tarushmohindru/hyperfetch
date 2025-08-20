@@ -12,7 +12,7 @@ use std::{
     path::Path,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -28,6 +28,7 @@ pub struct Downloader {
     downloaded_bytes: Arc<AtomicU64>,
     should_stop: Arc<AtomicBool>,
     speed_tracker: Arc<Mutex<Vec<(Instant, u64)>>>,
+    active_connections: Arc<AtomicUsize>,
 }
 
 impl Downloader {
@@ -70,6 +71,7 @@ impl Downloader {
             downloaded_bytes: Arc::new(AtomicU64::new(0)),
             should_stop: Arc::new(AtomicBool::new(false)),
             speed_tracker: Arc::new(Mutex::new(Vec::new())),
+            active_connections: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -148,6 +150,8 @@ impl Downloader {
         output_path: P,
         start_from: u64,
     ) -> Result<(), anyhow::Error> {
+        // Reflect a single active connection during single-threaded download
+        self.active_connections.fetch_add(1, Ordering::SeqCst);
         let mut file = if start_from > 0 {
             OpenOptions::new()
                 .write(true)
@@ -175,6 +179,8 @@ impl Downloader {
                 .fetch_add(chunk.len() as u64, Ordering::SeqCst);
         }
 
+        // Done with the single connection
+        self.active_connections.fetch_sub(1, Ordering::SeqCst);
         Ok(())
     }
 
@@ -232,6 +238,7 @@ impl Downloader {
             let should_stop = self.should_stop.clone();
             let retry_attempts = self.config.retry_attempts.clone();
             let retry_delay = self.config.retry_delay.clone();
+            let active_connections = self.active_connections.clone();
 
             let handle = tokio::spawn(async move {
                 while !should_stop.load(Ordering::SeqCst) {
@@ -249,15 +256,17 @@ impl Downloader {
                     };
 
                     if let Some(mut chunk) = chunk {
-                        match Self::download_chunk(
+                        // Increment active connections for this in-flight chunk
+                        active_connections.fetch_add(1, Ordering::SeqCst);
+                        let res = Self::download_chunk(
                             &client,
                             &url,
                             &output_path,
                             &mut chunk,
                             &downloaded_bytes,
                         )
-                        .await
-                        {
+                        .await;
+                        match res {
                             Ok(_) => {
                                 {
                                     let mut chunks_guard = chunks.lock().unwrap();
@@ -276,6 +285,8 @@ impl Downloader {
                                 sleep(retry_delay).await;
                             }
                         }
+                        // Decrement active connections when this chunk attempt finishes
+                        active_connections.fetch_sub(1, Ordering::SeqCst);
                     } else {
                         break;
                     }
@@ -350,6 +361,7 @@ impl Downloader {
         let downloaded_bytes = self.downloaded_bytes.clone();
         let speed_tracker = self.speed_tracker.clone();
         let should_stop = self.should_stop.clone();
+        let active_connections = self.active_connections.clone();
 
         tokio::spawn(async move {
             let mut interval = interval(SPEED_SAMPLE_INTERVAL);
@@ -416,6 +428,7 @@ impl Downloader {
                     progress_guard.downloaded_bytes = current_bytes;
                     progress_guard.speed_bps = avg_speed;
                     progress_guard.eta_seconds = eta;
+                    progress_guard.active_connections = active_connections.load(Ordering::SeqCst);
                 }
 
                 // Call callback

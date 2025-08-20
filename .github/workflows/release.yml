@@ -26,10 +26,8 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: hyperfetch-x86_64-unknown-linux-gnu.tar.gz
             bin_path: target/release/hyperfetch
           - os: windows-latest
-            artifact_name: hyperfetch-x86_64-pc-windows-msvc.zip
             bin_path: target/release/hyperfetch.exe
 
     steps:
@@ -66,26 +64,19 @@ jobs:
       - name: Build release
         run: cargo build --release
 
-      - name: Package artifact (Linux)
+      - name: Prepare executable (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          chmod +x target/release/hyperfetch
-          if command -v strip >/dev/null 2>&1; then strip target/release/hyperfetch || true; fi
-          tar -czf "${{ matrix.artifact_name }}" -C target/release hyperfetch
-
-      - name: Package artifact (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Compress-Archive -Path 'target/release/hyperfetch.exe' -DestinationPath '${{ matrix.artifact_name }}' -Force
+          chmod +x "${{ matrix.bin_path }}"
+          if command -v strip >/dev/null 2>&1; then strip "${{ matrix.bin_path }}" || true; fi
 
       - name: Create or update GitHub Release and upload asset
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.vars.outputs.release_tag }}
           files: |
-            ${{ matrix.artifact_name }}
+            ${{ matrix.bin_path }}
           draft: false
           prerelease: false
           generate_release_notes: true
